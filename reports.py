@@ -3,25 +3,30 @@ from datetime import date, timedelta
 import database
 import os
 
-def generate_missing_workers_excel(group_id):
-    today_str = date.today().isoformat()
+def generate_missing_workers_excel(group_id, date_obj=None):
+    if date_obj is None:
+        date_obj = date.today()
+    
+    date_str = date_obj.isoformat()
     all_users = database.get_all_users(group_id) # list of dicts
-    submitted_ids = database.get_submitted_users_today(group_id) # set of ids
+    
+    # Use generic date function
+    submitted_ids = database.get_submitted_users_by_date(group_id, date_str) 
     
     missing_workers = []
     for user in all_users:
         if user['user_id'] not in submitted_ids:
             missing_workers.append({
                 'Name': user['full_name'],
-                'Telegram ID': user['user_id']
+                'Telegram ID': user['user_id'],
+                'Date': date_str
             })
             
     if not missing_workers:
         return None
         
     df = pd.DataFrame(missing_workers)
-    # Include group_id in filename to prevent collisions if running parallel (though asyncio is single threaded usually)
-    filename = f"missing_report_g{group_id}_{today_str}.xlsx"
+    filename = f"missing_report_g{group_id}_{date_str}.xlsx"
     df.to_excel(filename, index=False)
     return filename
 

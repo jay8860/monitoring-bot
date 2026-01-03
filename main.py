@@ -185,6 +185,43 @@ async def manual_report_handler(update: Update, context: ContextTypes.DEFAULT_TY
         except:
             pass
 
+async def missing_report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Only works in groups
+    if update.effective_chat.type not in ['group', 'supergroup']:
+        await update.message.reply_text("This command only works in groups.")
+        return
+
+    await register_group_middleware(update, context)
+    group_id = update.effective_chat.id
+    
+    # Parse date argument
+    target_date = None
+    if context.args:
+        try:
+            date_str = context.args[0]
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            await update.message.reply_text("Invalid date format. Use YYYY-MM-DD.\nExample: /missing 2023-10-27")
+            return
+    else:
+        target_date = datetime.now().date()
+        
+    date_label = target_date.isoformat()
+    
+    file_path = reports.generate_missing_workers_excel(group_id, target_date)
+    if file_path:
+        await context.bot.send_document(
+            chat_id=group_id, 
+            document=open(file_path, 'rb'),
+            caption=f"📄 Missing Submissions List ({date_label})"
+        )
+        try:
+            os.remove(file_path)
+        except:
+            pass
+    else:
+        await update.message.reply_text(f"Everyone has submitted for {date_label}! ✅")
+
 def main():
     if not TOKEN:
         print("Error: TELEGRAM_BOT_TOKEN not found in .env file")
@@ -197,6 +234,8 @@ def main():
     # Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("report", manual_report_handler))
+    application.add_handler(CommandHandler("missing", missing_report_handler))
+    application.add_handler(CommandHandler("missing", missing_report_handler))
     
     # Handles photos
     application.add_handler(MessageHandler(filters.PHOTO, photo_handler))

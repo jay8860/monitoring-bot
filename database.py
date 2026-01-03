@@ -144,10 +144,13 @@ def get_all_users(group_id):
     return users
 
 def get_submitted_users_today(group_id):
+    # Wrapper for backward compatibility or simple usage
+    return get_submitted_users_by_date(group_id, date.today().isoformat())
+
+def get_submitted_users_by_date(group_id, date_str):
     conn = get_connection()
     c = conn.cursor()
-    today_str = date.today().isoformat()
-    c.execute("SELECT DISTINCT user_id FROM submissions WHERE group_id = ? AND date(timestamp) = ?", (group_id, today_str))
+    c.execute("SELECT DISTINCT user_id FROM submissions WHERE group_id = ? AND date(timestamp) = ?", (group_id, date_str))
     ids = [r[0] for r in c.fetchall()]
     conn.close()
     return set(ids)
