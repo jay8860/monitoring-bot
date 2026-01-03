@@ -235,7 +235,6 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("report", manual_report_handler))
     application.add_handler(CommandHandler("missing", missing_report_handler))
-    application.add_handler(CommandHandler("missing", missing_report_handler))
     
     # Handles photos
     application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
