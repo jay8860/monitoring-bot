@@ -222,44 +222,6 @@ async def missing_report_handler(update: Update, context: ContextTypes.DEFAULT_T
     else:
         await update.message.reply_text(f"Everyone has submitted for {date_label}! ✅")
 
-def main():
-    if not TOKEN:
-        print("Error: TELEGRAM_BOT_TOKEN not found in .env file")
-        # return
-
-    database.init_db()
-    
-    application = ApplicationBuilder().token(TOKEN if TOKEN else "DUMMY_TOKEN").build()
-    
-    # Handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("report", manual_report_handler))
-    application.add_handler(CommandHandler("missing", missing_report_handler))
-    application.add_handler(CommandHandler("weekly", weekly_report_handler))
-    
-    # Handles photos
-    application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
-    
-    # Capture text to register groups even if they don't send photos immediately
-    # And to update group title
-    async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await register_group_middleware(update, context)
-            
-    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), text_handler))
-
-    # Job Queue
-    job_queue = application.job_queue
-    tz = pytz.timezone('Asia/Kolkata')
-    
-    # 8:00 AM - Reminder
-    job_queue.run_daily(send_daily_reminder, time(hour=8, minute=0, tzinfo=tz))
-
-    # 2:00 PM - Status
-    job_queue.run_daily(report_2pm, time(hour=14, minute=0, tzinfo=tz)) 
-    
-    # 6:00 PM - Daily Final Report
-    job_queue.run_daily(report_6pm, time(hour=18, minute=0, tzinfo=tz))
-
 async def send_saturday_report(context: ContextTypes.DEFAULT_TYPE):
     """
     Sends 'Past 7 Days' stats and 'Low Attendance' Excel on Saturday 8 AM.
@@ -288,16 +250,6 @@ async def send_saturday_report(context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logging.error(f"Failed to send Saturday report to {title} ({group_id}): {e}")
 
-    # Sunday 8:00 PM - Weekly Report
-    # days=(6,) means Sunday (Mon=0)
-    job_queue.run_daily(report_weekly, time(hour=20, minute=0, tzinfo=tz), days=(6,))
-    
-    # Saturday 8:00 AM - Stats & Low Attendance Report
-    # days=(5,) means Saturday
-    job_queue.run_daily(send_saturday_report, time(hour=8, minute=0, tzinfo=tz), days=(5,))
-
-    print("Monitoring Bot is running (Multi-Group Mode)...")
-
 async def weekly_report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type not in ['group', 'supergroup']:
         await update.message.reply_text("This command only works in groups.")
@@ -308,6 +260,53 @@ async def weekly_report_handler(update: Update, context: ContextTypes.DEFAULT_TY
     
     stats_msg = reports.get_past_week_stats(group_id)
     await update.message.reply_text(stats_msg, parse_mode='Markdown')
+
+def main():
+    if not TOKEN:
+        print("Error: TELEGRAM_BOT_TOKEN not found in .env file")
+        # return
+
+    database.init_db()
+    
+    application = ApplicationBuilder().token(TOKEN if TOKEN else "DUMMY_TOKEN").build()
+    
+    # Handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("report", manual_report_handler))
+    application.add_handler(CommandHandler("missing", missing_report_handler))
+    application.add_handler(CommandHandler("weekly", weekly_report_handler))
+    
+    # Handles photos
+    application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
+    
+    # Capture text to register groups even if they don't send photos immediately
+    async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await register_group_middleware(update, context)
+            
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), text_handler))
+
+    # Job Queue
+    job_queue = application.job_queue
+    tz = pytz.timezone('Asia/Kolkata')
+    
+    # 8:00 AM - Reminder
+    job_queue.run_daily(send_daily_reminder, time(hour=8, minute=0, tzinfo=tz))
+
+    # 2:00 PM - Status
+    job_queue.run_daily(report_2pm, time(hour=14, minute=0, tzinfo=tz)) 
+    
+    # 6:00 PM - Daily Final Report
+    job_queue.run_daily(report_6pm, time(hour=18, minute=0, tzinfo=tz))
+
+    # Sunday 8:00 PM - Weekly Report
+    # days=(6,) means Sunday (Mon=0)
+    job_queue.run_daily(report_weekly, time(hour=20, minute=0, tzinfo=tz), days=(6,))
+    
+    # Saturday 8:00 AM - Stats & Low Attendance Report
+    # days=(5,) means Saturday
+    job_queue.run_daily(send_saturday_report, time(hour=8, minute=0, tzinfo=tz), days=(5,))
+
+    print("Monitoring Bot is running (Multi-Group Mode)...")
     
     if TOKEN:
         application.run_polling()
