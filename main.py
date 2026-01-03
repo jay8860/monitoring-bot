@@ -90,7 +90,9 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, reply_to_message_id=update.message.id)
         
     elif status == 'already_submitted':
-        await update.message.reply_text(f"{full_name}, you have already submitted today.", reply_to_message_id=update.message.id)
+        # Silencing duplicate replies to declutter group
+        # await update.message.reply_text(f"{full_name}, you have already submitted today.", reply_to_message_id=update.message.id)
+        pass
 
 # Scheduled Jobs
 async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE):
