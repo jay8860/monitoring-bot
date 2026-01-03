@@ -1,0 +1,9 @@
+python-telegram-bot
+apscheduler
+pandas
+openpyxl
+python-dotenv
+pytz
+ultralytics
+opencv-python-headless
+
