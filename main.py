@@ -235,6 +235,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("report", manual_report_handler))
     application.add_handler(CommandHandler("missing", missing_report_handler))
+    application.add_handler(CommandHandler("weekly", weekly_report_handler))
     
     # Handles photos
     application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
@@ -259,11 +260,54 @@ def main():
     # 6:00 PM - Daily Final Report
     job_queue.run_daily(report_6pm, time(hour=18, minute=0, tzinfo=tz))
 
+async def send_saturday_report(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Sends 'Past 7 Days' stats and 'Low Attendance' Excel on Saturday 8 AM.
+    """
+    groups = database.get_all_active_groups()
+    
+    for group_id, title in groups:
+        try:
+            # 1. Past 7 Days Stats
+            stats_msg = reports.get_past_week_stats(group_id)
+            await context.bot.send_message(chat_id=group_id, text=stats_msg, parse_mode='Markdown')
+            
+            # 2. Low Attendance Excel
+            file_path = reports.generate_low_attendance_excel(group_id)
+            if file_path:
+                await context.bot.send_document(
+                    chat_id=group_id, 
+                    document=open(file_path, 'rb'),
+                    caption="📄 Low Attendance Alert (< 3 days Mon-Fri)"
+                )
+                try: os.remove(file_path)
+                except: pass
+            else:
+                await context.bot.send_message(chat_id=group_id, text="✅ Everyone has good attendance this week (> 3 days)!")
+                
+        except Exception as e:
+            logging.error(f"Failed to send Saturday report to {title} ({group_id}): {e}")
+
     # Sunday 8:00 PM - Weekly Report
     # days=(6,) means Sunday (Mon=0)
     job_queue.run_daily(report_weekly, time(hour=20, minute=0, tzinfo=tz), days=(6,))
     
+    # Saturday 8:00 AM - Stats & Low Attendance Report
+    # days=(5,) means Saturday
+    job_queue.run_daily(send_saturday_report, time(hour=8, minute=0, tzinfo=tz), days=(5,))
+
     print("Monitoring Bot is running (Multi-Group Mode)...")
+
+async def weekly_report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type not in ['group', 'supergroup']:
+        await update.message.reply_text("This command only works in groups.")
+        return
+        
+    await register_group_middleware(update, context)
+    group_id = update.effective_chat.id
+    
+    stats_msg = reports.get_past_week_stats(group_id)
+    await update.message.reply_text(stats_msg, parse_mode='Markdown')
     
     if TOKEN:
         application.run_polling()

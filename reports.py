@@ -86,3 +86,95 @@ def generate_weekly_report(group_id, end_date=None):
         msg += f"- {item['Name']}: {item['Visits']}/7\n"
         
     return msg
+
+def get_past_week_stats(group_id):
+    """
+    Generates text stats for the past 7 days (including today).
+    Useful for /weekly command which can be run any day.
+    """
+    today = date.today()
+    start_date = today - timedelta(days=6) # 7 days inclusive
+    
+    start_str = start_date.isoformat()
+    end_str = today.isoformat()
+    
+    submissions = database.get_submissions_between_dates(group_id, start_str, end_str)
+    
+    user_counts = {}
+    for sub in submissions:
+        uid = sub[0]
+        user_counts[uid] = user_counts.get(uid, 0) + 1
+        
+    all_users = database.get_all_users(group_id)
+    report_data = []
+    for user in all_users:
+        uid = user['user_id']
+        name = user['full_name']
+        count = user_counts.get(uid, 0)
+        report_data.append({'Name': name, 'Visits': count})
+        
+    report_data.sort(key=lambda x: x['Visits'], reverse=True)
+    
+    msg = f"📅 *Past 7 Days Report ({start_str} to {end_str})*\n\n"
+    for item in report_data:
+        msg += f"- {item['Name']}: {item['Visits']} days\n"
+        
+    return msg
+
+def generate_low_attendance_excel(group_id):
+    """
+    Generates Excel list of people with < 3 submissions in the last week (Mon-Sat).
+    To be run on Saturday 8 AM.
+    """
+    # Logic: Last Mon to Last Sat (which is yesterday relative to Sunday, or today relative to Sat).
+    # Assuming this runs on Saturday morning, we look at Mon (5 days ago) to Sat (today) - wait, if run at 8AM Sat, Sat is just starting.
+    # Request says: "list on Saturday 8 AM also of people who have not done inspection less than three times in the last week Monday to Saturday"
+    # Technically Mon-Sat implies including Saturday. But at 8 AM Saturday, Saturday isn't over.
+    # Interpretation: List people who have done < 3 times from Monday to *Friday*? Or maybe previous week?
+    # Logic: "last week Monday to Saturday".
+    # Best approach: If run on Saturday AM, check Monday to Friday (5 days). If user attended < 3 times.
+    # Alternatively, if meant for "end of week", maybe check Monday to Friday.
+    
+    today = date.today() # Saturday
+    # Monday of this week
+    monday = today - timedelta(days=today.weekday()) 
+    # Check Mon -> Fri (5 days)
+    # Or should we check Mon -> Sat (today)? But day just started.
+    # Let's check Mon -> Fri to be safe as data is complete.
+    
+    # Actually, let's include Saturday but effectively it's 0 for Saturday so far.
+    # Let's stick to Mon-Fri (5 days) or Mon-Today (6 days).
+    # "less than three times in the last week" suggests looking at ~6 days.
+    
+    # Let's check Monday to Friday (5 days).
+    friday = today - timedelta(days=1)
+    
+    start_str = monday.isoformat()
+    end_str = friday.isoformat()
+    
+    submissions = database.get_submissions_between_dates(group_id, start_str, end_str)
+    user_counts = {}
+    for sub in submissions:
+        uid = sub[0]
+        user_counts[uid] = user_counts.get(uid, 0) + 1
+        
+    all_users = database.get_all_users(group_id)
+    low_attendance = []
+    
+    for user in all_users:
+        uid = user['user_id']
+        count = user_counts.get(uid, 0)
+        if count < 3:
+            low_attendance.append({
+                'Name': user['full_name'],
+                'Telegram ID': user['user_id'],
+                'Visits (Mon-Fri)': count
+            })
+            
+    if not low_attendance:
+        return None
+        
+    df = pd.DataFrame(low_attendance)
+    filename = f"low_attendance_g{group_id}_{start_str}_to_{end_str}.xlsx"
+    df.to_excel(filename, index=False)
+    return filename

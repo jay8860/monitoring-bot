@@ -111,8 +111,16 @@ def log_submission(user_id, group_id):
     last_date = row[1]
     total_submissions = row[2] + 1
     
+    today_date = date.today()
+    # Check for Monday -> Saturday skip (Sunday optional)
+    is_monday = (today_date.weekday() == 0) # 0 is Monday
+    saturday_str = (today_date - timedelta(days=2)).isoformat() if is_monday else None
+
     new_streak = 1
     if last_date == yesterday_str:
+        new_streak = current_streak + 1
+    elif is_monday and last_date == saturday_str:
+        # User submitted on Saturday, skipped Sunday, submitting on Monday -> Streak continues
         new_streak = current_streak + 1
     elif last_date == today_str:
         new_streak = current_streak
