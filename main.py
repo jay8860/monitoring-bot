@@ -261,6 +261,60 @@ async def weekly_report_handler(update: Update, context: ContextTypes.DEFAULT_TY
     stats_msg = reports.get_past_week_stats(group_id)
     await update.message.reply_text(stats_msg, parse_mode='Markdown')
 
+async def fortnightly_report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type not in ['group', 'supergroup']:
+        await update.message.reply_text("This command only works in groups.")
+        return
+    
+    await register_group_middleware(update, context)
+    group_id = update.effective_chat.id
+    
+    today = datetime.now().date()
+    # "Fortnightly" = Last 15 days
+    start_date = today - timedelta(days=14) 
+    
+    await update.message.reply_text(f"⏳ Generating Fortnightly Report ({start_date} to {today})...")
+    
+    file_path = reports.generate_attendance_register(group_id, start_date, today)
+    
+    if file_path:
+        await context.bot.send_document(
+            chat_id=group_id,
+            document=open(file_path, 'rb'),
+            caption=f"📅 Fortnightly Attendance Register\n({start_date} to {today})"
+        )
+        try: os.remove(file_path)
+        except: pass
+    else:
+        await update.message.reply_text("No data found for this period.")
+
+async def monthly_report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type not in ['group', 'supergroup']:
+        await update.message.reply_text("This command only works in groups.")
+        return
+    
+    await register_group_middleware(update, context)
+    group_id = update.effective_chat.id
+    
+    today = datetime.now().date()
+    # "Monthly" = Last 30 days
+    start_date = today - timedelta(days=29) 
+    
+    await update.message.reply_text(f"⏳ Generating Monthly Report ({start_date} to {today})...")
+    
+    file_path = reports.generate_attendance_register(group_id, start_date, today)
+    
+    if file_path:
+        await context.bot.send_document(
+            chat_id=group_id,
+            document=open(file_path, 'rb'),
+            caption=f"📅 Monthly Attendance Register\n({start_date} to {today})"
+        )
+        try: os.remove(file_path)
+        except: pass
+    else:
+        await update.message.reply_text("No data found for this period.")
+
 def main():
     if not TOKEN:
         print("Error: TELEGRAM_BOT_TOKEN not found in .env file")
@@ -275,6 +329,8 @@ def main():
     application.add_handler(CommandHandler("report", manual_report_handler))
     application.add_handler(CommandHandler("missing", missing_report_handler))
     application.add_handler(CommandHandler("weekly", weekly_report_handler))
+    application.add_handler(CommandHandler("fortnightly", fortnightly_report_handler))
+    application.add_handler(CommandHandler("monthly", monthly_report_handler))
     
     # Handles photos
     application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
