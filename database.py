@@ -2,7 +2,13 @@ import sqlite3
 from datetime import datetime, date, timedelta
 import os
 
-DB_NAME = "monitoring.db"
+# Use Railway Volume if it exists, otherwise use local file
+if os.path.exists('/app/data'):
+    DB_NAME = "/app/data/monitoring.db"
+    # Ensure directory is writable/exists natively
+    os.makedirs('/app/data', exist_ok=True)
+else:
+    DB_NAME = "monitoring.db"
 
 def get_connection():
     return sqlite3.connect(DB_NAME)

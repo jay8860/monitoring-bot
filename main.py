@@ -28,7 +28,17 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 # Removed GLOBAL GROUP_CHAT_ID as we now support multiple groups
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Hello! Monitoring Bot is active.\n✅ Ready to track inspections.")
+    msg = (
+        "Hello! 🤖 *Monitoring Bot* is active.\n"
+        "✅ Ready to track daily inspections.\n\n"
+        "**Manual Commands**:\n"
+        "• `/report` - Today's Status & Stats\n"
+        "• `/missing` - List of people who missed today\n"
+        "• `/weekly` - Past 7 Days Stats\n"
+        "• `/fortnightly` - 15 Days Attendance Tracker\n"
+        "• `/monthly` - 30 Days Attendance Tracker"
+    )
+    await update.message.reply_text(msg, parse_mode='Markdown')
 
 # Load model (globally to cache it)
 model = YOLO('yolov8n.pt')
